@@ -2,8 +2,11 @@
 #ifndef OBJECT_HPP
 #define OBJECT_HPP
 
-#include<iostream>
 #include<list>
+#include<functional>
+#include<utility>
+#include<stdexcept>
+#include<mutex>
 
 namespace my
 {
@@ -18,7 +21,10 @@ namespace my
 		}
 		virtual ~Object()
 		{
-			std::cout << "Object with id: " << id_ << ": ~Object() (destructor) " << std::endl;
+			std::lock_guard<std::mutex> lock_(mutex_);
+			for (std::function<void()>* handler : handlers_)
+				(*handler)();
+
 			for (Object* ptr : children_)
 				delete ptr;
 		}
@@ -41,19 +47,39 @@ namespace my
 			parent_ = parent;
 		}
 		int getId() const { return id_; }
-
+		void setOnDelete(std::function<void()> handler)
+		{
+			std::lock_guard<std::mutex> lock_(mutex_);
+			std::function<void()>* func_ptr{nullptr};
+			try {
+				func_ptr = new std::function<void()>(std::move(handler));
+				handlers_.push_back(func_ptr);
+			}
+			catch (...) {
+				if (func_ptr != nullptr)
+				{
+					handlers_.remove(func_ptr);
+					delete func_ptr;
+				}
+				throw std::runtime_error{ "setOnDelete failed" };
+			}
+		}
 	protected:
 		Object* parent_{};
 
 	private:
-		static int counter_;
-		int id_{};
-		std::list<Object*> children_;
 		void addChild(Object* child)
 		{
 			if (child == nullptr) return;
 			children_.push_back(child);
 		}
+
+	private:
+		static int counter_;
+		int id_{};
+		std::list<Object*> children_;
+		mutable std::mutex mutex_;
+		std::list<std::function<void()>*> handlers_;
 	};
 
 	int Object::counter_ = 0;

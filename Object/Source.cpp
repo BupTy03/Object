@@ -34,6 +34,7 @@ int main(int argc, char** argv)
 
 	{
 		Object parent;
+		parent.setOnDelete([]() { cout << "Object \"parent\" is destructed" << endl; });
 		Tree* tree = new Tree(&parent);
 		Apple* app1 = new Apple(1, tree);
 		Apple* app2 = new Apple(2, tree);
